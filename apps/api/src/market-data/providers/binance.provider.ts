@@ -34,6 +34,7 @@ export class BinanceProvider extends EventEmitter {
   private heartbeatInterval: NodeJS.Timeout | null = null;
   private heartbeatTimeout: NodeJS.Timeout | null = null;
   private isConnecting = false;
+  private subscriptionTimeout: NodeJS.Timeout | null = null;
 
   // Circuit breaker state
   private circuitState: CircuitState = CircuitState.CLOSED;
@@ -42,6 +43,7 @@ export class BinanceProvider extends EventEmitter {
   private circuitOpenTime: number | null = null;
   private readonly circuitResetTimeout = 60000; // 60 seconds
 
+  // Use combined stream with pre-built URL for better reliability
   private readonly BINANCE_WS_URL = 'wss://stream.binance.com:9443/ws';
   private readonly HEARTBEAT_INTERVAL = 30000; // 30 seconds
   private readonly HEARTBEAT_TIMEOUT = 60000; // 60 seconds
@@ -67,7 +69,18 @@ export class BinanceProvider extends EventEmitter {
 
     try {
       this.logger.log('Connecting to Binance WebSocket...');
-      this.ws = new WebSocket(this.BINANCE_WS_URL);
+
+      // Build combined stream URL if we have subscribed symbols
+      let wsUrl = this.BINANCE_WS_URL;
+      if (this.subscribedSymbols.size > 0) {
+        const streams = Array.from(this.subscribedSymbols)
+          .map(s => `${s.toLowerCase()}@miniTicker`)
+          .join('/');
+        wsUrl = `wss://stream.binance.com:9443/stream?streams=${streams}`;
+        this.logger.log(`Using combined stream with ${this.subscribedSymbols.size} symbols`);
+      }
+
+      this.ws = new WebSocket(wsUrl);
 
       this.ws.on('open', () => this.handleOpen());
       this.ws.on('message', (data) => this.handleMessage(data));
@@ -104,14 +117,38 @@ export class BinanceProvider extends EventEmitter {
     try {
       const message = JSON.parse(data.toString());
 
+      // Debug: Log messages (remove after debugging)
+      this['_messageCount'] = (this['_messageCount'] || 0) + 1;
+      if (this['_messageCount'] <= 5) {
+        this.logger.debug(`Binance message #${this['_messageCount']}: ${JSON.stringify(message).substring(0, 200)}`);
+      }
+
       // Handle pong response
-      if (message.result === null) {
+      if (message.result === null || message.result !== undefined) {
         this.resetHeartbeatTimeout();
         return;
       }
 
-      // Handle ticker updates
-      if (message.e === '24hrMiniTicker') {
+      // Handle stream data wrapper
+      if (message.stream && message.data) {
+        const ticker = message.data;
+        if (ticker.e === '24hrMiniTicker') {
+          const priceUpdate: PriceUpdate = {
+            symbol: ticker.s,
+            price: parseFloat(ticker.c),
+            priceChange: parseFloat(ticker.p),
+            priceChangePercent: parseFloat(ticker.P),
+            high24h: parseFloat(ticker.h),
+            low24h: parseFloat(ticker.l),
+            volume24h: parseFloat(ticker.v),
+            lastUpdateTime: ticker.E,
+          };
+
+          this.emit('priceUpdate', priceUpdate);
+        }
+      }
+      // Handle direct ticker updates (old format)
+      else if (message.e === '24hrMiniTicker') {
         const ticker = message as BinanceTickerMessage;
         const priceUpdate: PriceUpdate = {
           symbol: ticker.s,
@@ -217,18 +254,20 @@ export class BinanceProvider extends EventEmitter {
   async subscribe(symbol: string): Promise<void> {
     const normalizedSymbol = symbol.toUpperCase();
     this.subscribedSymbols.add(normalizedSymbol);
+    this.logger.log(`Subscribed to ${normalizedSymbol}`);
 
-    if (this.ws?.readyState === WebSocket.OPEN) {
-      const stream = `${normalizedSymbol.toLowerCase()}@miniTicker`;
-      const subscribeMessage = {
-        method: 'SUBSCRIBE',
-        params: [stream],
-        id: Date.now(),
-      };
-
-      this.ws.send(JSON.stringify(subscribeMessage));
-      this.logger.log(`Subscribed to ${normalizedSymbol}`);
+    // Batch subscriptions - wait 500ms for more to come in
+    if (this.subscriptionTimeout) {
+      clearTimeout(this.subscriptionTimeout);
     }
+
+    this.subscriptionTimeout = setTimeout(async () => {
+      this.subscriptionTimeout = null;
+      // Now connect with all symbols
+      if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+        await this.connect();
+      }
+    }, 500);
   }
 
   async unsubscribe(symbol: string): Promise<void> {
@@ -248,12 +287,15 @@ export class BinanceProvider extends EventEmitter {
     }
   }
 
-  private resubscribeAll() {
+  private async resubscribeAll() {
     if (this.subscribedSymbols.size > 0) {
       this.logger.log(`Re-subscribing to ${this.subscribedSymbols.size} symbols`);
-      for (const symbol of this.subscribedSymbols) {
-        this.subscribe(symbol);
+      // Close existing connection
+      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        this.ws.close();
       }
+      // Reconnect with all symbols
+      await this.connect();
     }
   }
 

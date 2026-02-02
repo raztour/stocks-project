@@ -35,8 +35,8 @@ export class MarketDataService extends EventEmitter implements OnModuleInit {
     // Start batch processor
     this.startBatchProcessor();
 
-    // Initialize Binance connection
-    await this.binanceProvider.connect();
+    // Don't connect immediately - wait for subscriptions
+    // Connection will be established when first subscription arrives
 
     this.logger.log('Market data service initialized');
   }

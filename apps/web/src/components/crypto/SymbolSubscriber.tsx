@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { useWebSocket } from '@/hooks/useWebSocket';
+import { useCryptoStore } from '@/store/cryptoStore';
 
 interface SymbolSubscriberProps {
   symbols: string[];
@@ -9,9 +10,11 @@ interface SymbolSubscriberProps {
 
 export function SymbolSubscriber({ symbols }: SymbolSubscriberProps) {
   const { subscribe, unsubscribe } = useWebSocket();
+  const connectionStatus = useCryptoStore((state) => state.connectionStatus);
 
   useEffect(() => {
-    if (symbols.length > 0) {
+    // Only subscribe when connected
+    if (connectionStatus === 'connected' && symbols.length > 0) {
       subscribe(symbols);
     }
 
@@ -20,7 +23,7 @@ export function SymbolSubscriber({ symbols }: SymbolSubscriberProps) {
         unsubscribe(symbols);
       }
     };
-  }, [symbols, subscribe, unsubscribe]);
+  }, [connectionStatus, symbols, subscribe, unsubscribe]);
 
   return null;
 }
