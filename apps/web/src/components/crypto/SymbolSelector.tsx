@@ -14,6 +14,7 @@ export function SymbolSelector({
   onChange,
 }: SymbolSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -28,6 +29,16 @@ export function SymbolSelector({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isOpen]);
 
+  useEffect(() => {
+    if (!isOpen) setSearchQuery('');
+  }, [isOpen]);
+
+  const filteredSymbols = searchQuery.trim()
+    ? availableSymbols.filter((s) =>
+        s.toLowerCase().includes(searchQuery.toLowerCase().trim())
+      )
+    : availableSymbols;
+
   const toggleSymbol = (symbol: string) => {
     const next = selectedSymbols.includes(symbol)
       ? selectedSymbols.filter((s) => s !== symbol)
@@ -35,7 +46,7 @@ export function SymbolSelector({
     onChange(next);
   };
 
-  const selectAll = () => onChange([...availableSymbols]);
+  const selectAll = () => onChange([...new Set([...selectedSymbols, ...filteredSymbols])]);
   const clearAll = () => onChange([]);
 
   return (
@@ -58,7 +69,17 @@ export function SymbolSelector({
 
       {isOpen && (
         <div className="absolute left-0 top-full mt-1 z-10 w-64 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-lg py-2 max-h-80 overflow-y-auto">
-          <div className="flex gap-2 px-3 pb-2 border-b border-gray-200 dark:border-gray-600">
+          <div className="px-2 pb-2 border-b border-gray-200 dark:border-gray-600">
+            <input
+              type="text"
+              placeholder="Search symbols..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-2 py-1.5 text-sm text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-primary"
+              onKeyDown={(e) => e.stopPropagation()}
+            />
+          </div>
+          <div className="flex gap-2 px-3 py-2 border-b border-gray-200 dark:border-gray-600">
             <button
               type="button"
               onClick={selectAll}
@@ -75,7 +96,12 @@ export function SymbolSelector({
             </button>
           </div>
           <ul className="py-1">
-            {availableSymbols.map((symbol) => (
+            {filteredSymbols.length === 0 ? (
+              <li className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">
+                No symbols match
+              </li>
+            ) : (
+            filteredSymbols.map((symbol) => (
               <li key={symbol}>
                 <label className="flex items-center gap-2 px-3 py-1.5 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700">
                   <input
@@ -87,7 +113,8 @@ export function SymbolSelector({
                   <span className="text-sm text-gray-800 dark:text-gray-200">{symbol}</span>
                 </label>
               </li>
-            ))}
+            ))
+            )}
           </ul>
         </div>
       )}
