@@ -24,10 +24,27 @@ const DEFAULT_SYMBOLS = [
   'LTCUSDT',
 ];
 
+const STORAGE_KEY = 'crypto-tracker-selected-symbols';
+const availableSet = new Set(DEFAULT_SYMBOLS);
+
+function getInitialSymbols(): string[] {
+  if (typeof window === 'undefined') return [...DEFAULT_SYMBOLS];
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [...DEFAULT_SYMBOLS];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed) || parsed.length === 0) return [...DEFAULT_SYMBOLS];
+    const valid = parsed.filter((s) => typeof s === 'string' && availableSet.has(s));
+    return valid.length > 0 ? valid : [...DEFAULT_SYMBOLS];
+  } catch {
+    return [...DEFAULT_SYMBOLS];
+  }
+}
+
 export default function DashboardPage() {
   const { connectionStatus, connect } = useCryptoStore();
   const [filter, setFilter] = useState<'all' | 'watchlist'>('all');
-  const [selectedSymbols, setSelectedSymbols] = useState<string[]>(() => [...DEFAULT_SYMBOLS]);
+  const [selectedSymbols, setSelectedSymbols] = useState<string[]>(getInitialSymbols);
 
   // Initialize WebSocket hooks
   useWebSocket();
@@ -35,6 +52,10 @@ export default function DashboardPage() {
   useEffect(() => {
     connect();
   }, [connect]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(selectedSymbols));
+  }, [selectedSymbols]);
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
