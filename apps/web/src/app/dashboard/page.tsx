@@ -7,7 +7,7 @@ import { ConnectionStatus } from '@/components/ConnectionStatus';
 import { CryptoGrid } from '@/components/crypto/CryptoGrid';
 import { SymbolSubscriber } from '@/components/crypto/SymbolSubscriber';
 
-// Popular crypto symbols to track
+// Popular crypto symbols to track (used as default selection and as full list for symbol filter)
 const DEFAULT_SYMBOLS = [
   'BTCUSDT',
   'ETHUSDT',
@@ -26,6 +26,7 @@ const DEFAULT_SYMBOLS = [
 export default function DashboardPage() {
   const { connectionStatus, connect } = useCryptoStore();
   const [filter, setFilter] = useState<'all' | 'watchlist'>('all');
+  const [selectedSymbols, setSelectedSymbols] = useState<string[]>(() => [...DEFAULT_SYMBOLS]);
 
   // Initialize WebSocket hooks
   useWebSocket();
@@ -51,7 +52,7 @@ export default function DashboardPage() {
           </div>
         </header>
 
-        <SymbolSubscriber symbols={DEFAULT_SYMBOLS} />
+        <SymbolSubscriber symbols={selectedSymbols} />
 
         {/* Filter Toggle */}
         <div className="mb-6 flex items-center gap-2">
