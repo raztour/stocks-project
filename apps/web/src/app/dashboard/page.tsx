@@ -131,7 +131,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <CryptoGrid filter={filter} />
+        <CryptoGrid filter={filter} selectedSymbols={selectedSymbols} />
       </div>
     </main>
   );
