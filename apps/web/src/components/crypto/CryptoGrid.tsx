@@ -2,7 +2,6 @@ import { useMemo } from 'react';
 import { useCryptoStore } from '@/store/cryptoStore';
 import { useWatchlistStore } from '@/store/watchlistStore';
 import { CryptoPriceCard } from './CryptoPriceCard';
-import { PriceUpdate } from '@crypto-tracker/shared-types';
 
 interface CryptoGridProps {
   filter?: 'all' | 'watchlist';
@@ -22,12 +21,8 @@ export function CryptoGrid({ filter = 'all', selectedSymbols = [] }: CryptoGridP
     }
 
     // When "all", only show cards for symbols the user has selected (subscribed)
-    if (selectedSymbols.length > 0) {
-      const selectedSet = new Set(selectedSymbols);
-      return allPrices.filter((price) => selectedSet.has(price.symbol));
-    }
-
-    return allPrices;
+    const selectedSet = new Set(selectedSymbols);
+    return allPrices.filter((price) => selectedSet.has(price.symbol));
   }, [prices, filter, watchlistItems, selectedSymbols]);
 
   if (priceArray.length === 0) {
