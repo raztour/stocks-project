@@ -25,6 +25,7 @@ const DEFAULT_SYMBOLS = [
 ];
 
 const STORAGE_KEY = 'crypto-tracker-selected-symbols';
+const FILTER_STORAGE_KEY = 'crypto-tracker-show-filter';
 const availableSet = new Set(DEFAULT_SYMBOLS);
 
 function getInitialSymbols(): string[] {
@@ -41,9 +42,20 @@ function getInitialSymbols(): string[] {
   }
 }
 
+function getInitialFilter(): 'all' | 'watchlist' {
+  if (typeof window === 'undefined') return 'all';
+  try {
+    const raw = localStorage.getItem(FILTER_STORAGE_KEY);
+    if (raw === 'all' || raw === 'watchlist') return raw;
+  } catch {
+    // ignore
+  }
+  return 'all';
+}
+
 export default function DashboardPage() {
   const { connectionStatus, connect } = useCryptoStore();
-  const [filter, setFilter] = useState<'all' | 'watchlist'>('all');
+  const [filter, setFilter] = useState<'all' | 'watchlist'>(getInitialFilter);
   const [selectedSymbols, setSelectedSymbols] = useState<string[]>(getInitialSymbols);
 
   // Initialize WebSocket hooks
@@ -56,6 +68,10 @@ export default function DashboardPage() {
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(selectedSymbols));
   }, [selectedSymbols]);
+
+  useEffect(() => {
+    localStorage.setItem(FILTER_STORAGE_KEY, filter);
+  }, [filter]);
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
