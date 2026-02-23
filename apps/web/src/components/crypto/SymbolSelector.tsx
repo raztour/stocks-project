@@ -49,11 +49,16 @@ export function SymbolSelector({
   const selectAll = () => onChange([...new Set([...selectedSymbols, ...filteredSymbols])]);
   const clearAll = () => onChange([]);
 
+  const isSearchActive = searchQuery.trim().length > 0;
+
   return (
     <div className="relative" ref={panelRef}>
       <button
         type="button"
         onClick={() => setIsOpen((o) => !o)}
+        aria-expanded={isOpen}
+        aria-haspopup="listbox"
+        aria-label="Choose symbols to display"
         className="inline-flex items-center gap-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
       >
         Symbols ({selectedSymbols.length})
@@ -68,7 +73,11 @@ export function SymbolSelector({
       </button>
 
       {isOpen && (
-        <div className="absolute left-0 top-full mt-1 z-10 w-64 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-lg py-2 max-h-80 overflow-y-auto">
+        <div
+          className="absolute left-0 top-full mt-1 z-10 w-64 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-lg py-2 max-h-80 overflow-y-auto"
+          role="listbox"
+          aria-label="Symbol list"
+        >
           <div className="px-2 pb-2 border-b border-gray-200 dark:border-gray-600">
             <input
               type="text"
@@ -77,6 +86,7 @@ export function SymbolSelector({
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-2 py-1.5 text-sm text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-primary"
               onKeyDown={(e) => e.stopPropagation()}
+              aria-label="Filter symbols"
             />
           </div>
           <div className="flex gap-2 px-3 py-2 border-b border-gray-200 dark:border-gray-600">
@@ -84,8 +94,9 @@ export function SymbolSelector({
               type="button"
               onClick={selectAll}
               className="text-xs font-medium text-primary hover:underline"
+              title={isSearchActive ? 'Add all visible symbols to selection' : undefined}
             >
-              Select all
+              {isSearchActive ? 'Select all visible' : 'Select all'}
             </button>
             <button
               type="button"
@@ -102,13 +113,19 @@ export function SymbolSelector({
               </li>
             ) : (
             filteredSymbols.map((symbol) => (
-              <li key={symbol}>
+              <li
+                key={symbol}
+                role="option"
+                aria-selected={selectedSymbols.includes(symbol)}
+                aria-label={`${symbol} ${selectedSymbols.includes(symbol) ? 'selected' : 'not selected'}`}
+              >
                 <label className="flex items-center gap-2 px-3 py-1.5 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700">
                   <input
                     type="checkbox"
                     checked={selectedSymbols.includes(symbol)}
                     onChange={() => toggleSymbol(symbol)}
                     className="rounded border-gray-300 dark:border-gray-600 text-primary focus:ring-primary"
+                    tabIndex={-1}
                   />
                   <span className="text-sm text-gray-800 dark:text-gray-200">{symbol}</span>
                 </label>

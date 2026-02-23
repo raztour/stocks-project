@@ -28,21 +28,24 @@ const STORAGE_KEY = 'crypto-tracker-selected-symbols';
 const FILTER_STORAGE_KEY = 'crypto-tracker-show-filter';
 const availableSet = new Set(DEFAULT_SYMBOLS);
 
-function getInitialSymbols(): string[] {
+function loadSymbolsFromStorage(): string[] {
   if (typeof window === 'undefined') return [...DEFAULT_SYMBOLS];
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return [...DEFAULT_SYMBOLS];
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed) || parsed.length === 0) return [...DEFAULT_SYMBOLS];
-    const valid = parsed.filter((s) => typeof s === 'string' && availableSet.has(s));
+    const valid = parsed
+      .filter((s) => typeof s === 'string')
+      .map((s) => (s as string).toUpperCase())
+      .filter((s) => availableSet.has(s));
     return valid.length > 0 ? valid : [...DEFAULT_SYMBOLS];
   } catch {
     return [...DEFAULT_SYMBOLS];
   }
 }
 
-function getInitialFilter(): 'all' | 'watchlist' {
+function loadFilterFromStorage(): 'all' | 'watchlist' {
   if (typeof window === 'undefined') return 'all';
   try {
     const raw = localStorage.getItem(FILTER_STORAGE_KEY);
@@ -55,8 +58,9 @@ function getInitialFilter(): 'all' | 'watchlist' {
 
 export default function DashboardPage() {
   const { connectionStatus, connect } = useCryptoStore();
-  const [filter, setFilter] = useState<'all' | 'watchlist'>(getInitialFilter);
-  const [selectedSymbols, setSelectedSymbols] = useState<string[]>(getInitialSymbols);
+  const [filter, setFilter] = useState<'all' | 'watchlist'>('all');
+  const [selectedSymbols, setSelectedSymbols] = useState<string[]>(() => [...DEFAULT_SYMBOLS]);
+  const [hasHydrated, setHasHydrated] = useState(false);
 
   // Initialize WebSocket hooks
   useWebSocket();
@@ -65,13 +69,20 @@ export default function DashboardPage() {
     connect();
   }, [connect]);
 
+  // Hydrate from localStorage after mount (client-only; SSR doesn't have localStorage)
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(selectedSymbols));
-  }, [selectedSymbols]);
+    setSelectedSymbols(loadSymbolsFromStorage());
+    setFilter(loadFilterFromStorage());
+    setHasHydrated(true);
+  }, []);
 
   useEffect(() => {
-    localStorage.setItem(FILTER_STORAGE_KEY, filter);
-  }, [filter]);
+    if (hasHydrated) localStorage.setItem(STORAGE_KEY, JSON.stringify(selectedSymbols));
+  }, [selectedSymbols, hasHydrated]);
+
+  useEffect(() => {
+    if (hasHydrated) localStorage.setItem(FILTER_STORAGE_KEY, filter);
+  }, [filter, hasHydrated]);
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
@@ -131,7 +142,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <CryptoGrid filter={filter} />
+        <CryptoGrid filter={filter} selectedSymbols={selectedSymbols} />
       </div>
     </main>
   );
